@@ -1,0 +1,261 @@
+/**
+ * tokamak-ui · tokamak.css
+ * Version: 0.1.0
+ * https://tokamak-ui.ereneksi.com
+ *
+ * Standalone CSS file. Two use cases:
+ *   1. No-JS fallback — use Tokamak class names without web components
+ *   2. Global token overrides — import alongside tokamak.min.js to
+ *      retheme every component at once
+ *
+ * Import:
+ *   <link rel="stylesheet" href="https://cdn.tokamak-ui.ereneksi.com/tokamak.css">
+ *   import 'tokamak-ui/tokamak.css';
+ */
+
+/* ─────────────────────────────────────────────────────────
+   Google Font
+───────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+/* ─────────────────────────────────────────────────────────
+   Primitive Scale
+───────────────────────────────────────────────────────── */
+:root {
+  --tok-gray-50:  #f8f8f8;
+  --tok-gray-100: #ebebeb;
+  --tok-gray-200: #d4d4d4;
+  --tok-gray-300: #aaaaaa;
+  --tok-gray-400: #777777;
+  --tok-gray-600: #444444;
+  --tok-gray-800: #1c1c1c;
+  --tok-gray-950: #080808;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Semantic Tokens — Light (default)
+───────────────────────────────────────────────────────── */
+:root {
+  --bg:        #ffffff;
+  --bg-2:      #f2f2f2;
+  --bg-3:      #e4e4e4;
+  --fg:        #080808;
+  --fg-2:      #555555;
+  --fg-3:      #999999;
+  --border:    #c8c8c8;
+  --border-hi: #080808;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Semantic Tokens — Dark
+───────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg:        #080808;
+  --bg-2:      #111111;
+  --bg-3:      #1c1c1c;
+  --fg:        #f2f2f2;
+  --fg-2:      #888888;
+  --fg-3:      #3a3a3a;
+  --border:    #242424;
+  --border-hi: #f2f2f2;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Geometry
+───────────────────────────────────────────────────────── */
+:root {
+  --skew:         -14deg;
+  --panel-radius: 80vh;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Spacing — 4px base unit
+───────────────────────────────────────────────────────── */
+:root {
+  --tok-space-2:  2px;
+  --tok-space-4:  4px;
+  --tok-space-8:  8px;
+  --tok-space-12: 12px;
+  --tok-space-16: 16px;
+  --tok-space-24: 24px;
+  --tok-space-32: 32px;
+  --tok-space-48: 48px;
+  --tok-space-64: 64px;
+  --tok-space-96: 96px;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Typography
+───────────────────────────────────────────────────────── */
+:root {
+  --tok-font: 'JetBrains Mono', monospace;
+
+  --tok-size-display: 48px;
+  --tok-size-h1:      32px;
+  --tok-size-h2:      22px;
+  --tok-size-h3:      16px;
+  --tok-size-body:    13px;
+  --tok-size-small:   11px;
+  --tok-size-label:   9px;
+
+  --tok-weight-light:    300;
+  --tok-weight-regular:  400;
+  --tok-weight-medium:   500;
+  --tok-weight-semibold: 600;
+  --tok-weight-bold:     700;
+
+  --tok-leading-tight:  1.2;
+  --tok-leading-snug:   1.4;
+  --tok-leading-normal: 1.6;
+  --tok-leading-loose:  1.85;
+
+  --tok-tracking-tight:  -0.02em;
+  --tok-tracking-normal:  0;
+  --tok-tracking-wide:    0.08em;
+  --tok-tracking-wider:   0.12em;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Animation
+───────────────────────────────────────────────────────── */
+:root {
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out:    cubic-bezier(0, 0, 0.2, 1);
+  --ease-in:     cubic-bezier(0.4, 0, 1, 1);
+  --ease-inout:  cubic-bezier(0.4, 0, 0.2, 1);
+
+  --dur-fast:  120ms;
+  --dur-base:  220ms;
+  --dur-slow:  420ms;
+  --dur-panel: 420ms;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Elevation
+───────────────────────────────────────────────────────── */
+:root {
+  --tok-shadow-sm:    0 1px 4px rgba(0,0,0,0.06);
+  --tok-shadow-md:    0 4px 24px rgba(0,0,0,0.08);
+  --tok-shadow-lg:    0 8px 60px rgba(0,0,0,0.12);
+  --tok-shadow-panel: -2px 0 60px rgba(0,0,0,0.18);
+}
+
+/* ─────────────────────────────────────────────────────────
+   Base Reset
+───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+.tok {
+  font-family: var(--tok-font);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* ─────────────────────────────────────────────────────────
+   Parallelogram Shell (no-JS class fallback)
+   Usage: <div class="tok-p-shell tok-card"> ... </div>
+───────────────────────────────────────────────────────── */
+.tok-p-shell {
+  position: relative;
+}
+.tok-p-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--bg-2);
+  border: 1.5px solid var(--border);
+  transform: skewX(var(--skew));
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background   var(--dur-fast) var(--ease-out);
+  z-index: 0;
+}
+.tok-p-shell > * {
+  position: relative;
+  z-index: 1;
+}
+.tok-p-shell:focus-within::before { border-color: var(--border-hi); background: var(--bg); }
+.tok-p-shell:hover::before        { border-color: var(--border-hi); }
+
+/* ─────────────────────────────────────────────────────────
+   Button (no-JS fallback classes)
+───────────────────────────────────────────────────────── */
+.tok-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0 28px; height: 40px;
+  font-family: var(--tok-font);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  cursor: pointer; border: none; outline: none;
+  transform: skewX(var(--skew));
+  transition: filter var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-spring);
+}
+.tok-btn:hover  { filter: brightness(0.88); }
+.tok-btn:active { filter: brightness(0.72); transform: skewX(var(--skew)) translateY(1px); }
+.tok-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.tok-btn > span { display: inline-block; transform: skewX(calc(var(--skew) * -1)); }
+
+.tok-btn-primary   { background: var(--fg); color: var(--bg); }
+.tok-btn-secondary { background: var(--bg-3); color: var(--fg); }
+.tok-btn-ghost     { background: transparent; color: var(--fg); box-shadow: inset 0 0 0 1.5px var(--fg); }
+.tok-btn-danger    { background: transparent; color: var(--fg); box-shadow: inset 0 0 0 1.5px var(--border); border-bottom: 2px solid var(--fg); }
+
+.tok-btn-sm { height: 30px; padding: 0 18px; font-size: 9px; }
+.tok-btn-lg { height: 52px; padding: 0 44px; font-size: 13px; }
+
+/* ─────────────────────────────────────────────────────────
+   Badge (no-JS fallback)
+───────────────────────────────────────────────────────── */
+.tok-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0 10px; height: 20px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  transform: skewX(var(--skew)); white-space: nowrap;
+  font-family: var(--tok-font);
+}
+.tok-badge > span { display: inline-block; transform: skewX(calc(var(--skew) * -1)); }
+.tok-badge-solid   { background: var(--fg);   color: var(--bg); }
+.tok-badge-outline { background: transparent; color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+.tok-badge-muted   { background: var(--bg-3); color: var(--fg-2); }
+
+/* ─────────────────────────────────────────────────────────
+   Input (no-JS fallback)
+───────────────────────────────────────────────────────── */
+.tok-input {
+  position: relative; z-index: 1; display: block; width: 100%;
+  padding: 10px 18px; background: transparent; border: none; outline: none;
+  font-family: var(--tok-font); font-size: 12px; color: var(--fg);
+}
+.tok-input::placeholder { color: var(--fg-3); }
+.tok-label  { display: block; font-size: 9px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-2); margin-bottom: 7px; }
+.tok-field  { margin-bottom: 18px; }
+.tok-hint   { font-size: 10px; color: var(--fg-3); margin-top: 6px; }
+.tok-error  { font-size: 10px; color: var(--fg); font-weight: 500; margin-top: 6px; }
+
+/* ─────────────────────────────────────────────────────────
+   Progress (no-JS fallback)
+───────────────────────────────────────────────────────── */
+.tok-progress-track {
+  height: 8px; background: var(--bg-3);
+  border: 1px solid var(--border);
+  transform: skewX(var(--skew));
+  overflow: hidden; position: relative;
+}
+.tok-progress-fill {
+  position: absolute; top: 0; left: 0; bottom: 0;
+  background: var(--fg);
+  transition: width var(--dur-slow) var(--ease-spring);
+}
+
+/* ─────────────────────────────────────────────────────────
+   Typography utilities
+───────────────────────────────────────────────────────── */
+.tok-display { font-size: var(--tok-size-display); font-weight: 700; letter-spacing: var(--tok-tracking-tight); }
+.tok-h1      { font-size: var(--tok-size-h1);      font-weight: 700; letter-spacing: var(--tok-tracking-tight); }
+.tok-h2      { font-size: var(--tok-size-h2);      font-weight: 700; letter-spacing: var(--tok-tracking-tight); }
+.tok-h3      { font-size: var(--tok-size-h3);      font-weight: 600; }
+.tok-body    { font-size: var(--tok-size-body);     line-height: var(--tok-leading-normal); }
+.tok-small   { font-size: var(--tok-size-small);   color: var(--fg-2); }
+.tok-label-text { font-size: var(--tok-size-label); letter-spacing: var(--tok-tracking-wider); text-transform: uppercase; color: var(--fg-3); }
+.tok-mono    { font-family: var(--tok-font); }
+.tok-muted   { color: var(--fg-2); }
+.tok-subtle  { color: var(--fg-3); }

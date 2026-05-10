@@ -1,25 +1,20 @@
 /**
  * tokamak-ui · tok-tabs
  *
- * Parallelogram tab strip with an animated active indicator.
- * Tabs are defined either by the `tabs` attribute (comma-separated)
- * or by slotting <tok-tab> children.
+ * Parallelogram tab strip.
  *
  * Attributes:
- *   tabs   — comma-separated list of tab labels  e.g. "Overview,Tokens,API"
- *   active — initially active tab label (defaults to first)
+ *   tabs   — comma-separated list of tab labels (changes rebuild the strip)
+ *   active — initially active label (defaults to first tab)
  *
  * Properties:
- *   .active — get/set the currently active tab by label
+ *   .active — get/set active tab (patches state, no re-render)
  *
  * Events:
- *   tok-change — { tab: string, index: number } — fires on tab switch. Bubbles, composed.
- *
- * @example
- *   <tok-tabs tabs="Overview,Tokens,Components" active="Tokens"></tok-tabs>
+ *   tok-change — { tab, index } on switch. Bubbles, composed.
  */
 
-import { TokamakElement } from '../utils.js';
+import { TokamakElement, esc } from '../utils.js';
 
 export class TokTabs extends TokamakElement {
   static observedAttributes = ['tabs', 'active'];
@@ -28,8 +23,9 @@ export class TokTabs extends TokamakElement {
     return this.attr('active') || this._tabs()[0] || '';
   }
 
-  set active(label) {
-    this.setAttribute('active', label);
+  set active(v) {
+    if (v == null) this.removeAttribute('active');
+    else           this.setAttribute('active', v);
   }
 
   _tabs() {
@@ -42,108 +38,104 @@ export class TokTabs extends TokamakElement {
 
       .strip {
         display: flex;
-        border-bottom: 1.5px solid var(--border);
-        transition: border-color var(--dur-base) var(--ease-out);
-        position: relative;
+        border-bottom: 1.5px solid var(--tok-border);
+        transition: border-color var(--tok-dur-base) var(--tok-ease-out);
       }
 
       button {
-        position: relative;
         padding: 10px 20px;
         font-size: 10px;
         font-weight: 600;
         letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: var(--fg-2);
+        color: var(--tok-fg-2);
         cursor: pointer;
         border: none;
         background: none;
         font-family: 'JetBrains Mono', monospace;
-        /* Bottom border sits on top of strip border */
         border-bottom: 2px solid transparent;
         margin-bottom: -1.5px;
-        transform: skewX(var(--skew));
+        transform: skewX(var(--tok-skew));
         transition:
-          color var(--dur-fast) var(--ease-out),
-          border-color var(--dur-fast) var(--ease-out),
-          background var(--dur-fast) var(--ease-out);
+          color var(--tok-dur-fast) var(--tok-ease-out),
+          border-color var(--tok-dur-fast) var(--tok-ease-out);
         outline: none;
       }
 
-      button:hover {
-        color: var(--fg);
-      }
-
+      button:hover { color: var(--tok-fg); }
       button:focus-visible {
-        outline: 2px solid var(--fg);
+        outline: 2px solid var(--tok-fg);
         outline-offset: -2px;
       }
 
       button.active {
-        color: var(--fg);
-        border-bottom-color: var(--fg);
+        color: var(--tok-fg);
+        border-bottom-color: var(--tok-fg);
       }
 
       button .inner {
         display: inline-block;
-        transform: skewX(calc(var(--skew) * -1));
+        transform: skewX(calc(var(--tok-skew) * -1));
       }
     `;
   }
 
   template() {
     const tabs   = this._tabs();
-    const active = this.active;
-
-    return `
-      <div class="strip" part="strip" role="tablist">
-        ${tabs.map((t, i) => `
-          <button
-            role="tab"
-            aria-selected="${t === active}"
-            data-label="${t}"
-            data-index="${i}"
-            class="${t === active ? 'active' : ''}"
-            part="tab ${t === active ? 'tab-active' : ''}"
-            tabindex="${t === active ? '0' : '-1'}"
-          ><span class="inner">${t}</span></button>
-        `).join('')}
-      </div>
-    `;
+    const active = this.attr('active') || tabs[0] || '';
+    return `<div class="strip" part="strip" role="tablist">${
+      tabs.map((t, i) => {
+        const isActive = t === active;
+        return `<button
+          role="tab"
+          data-label="${esc(t)}"
+          data-index="${i}"
+          class="${isActive ? 'active' : ''}"
+          part="tab${isActive ? ' tab-active' : ''}"
+          aria-selected="${isActive}"
+          tabindex="${isActive ? '0' : '-1'}"
+        ><span class="inner">${esc(t)}</span></button>`;
+      }).join('')
+    }</div>`;
   }
 
   hydrate() {
-    this.$$('button').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const label = btn.dataset.label;
-        const index = parseInt(btn.dataset.index);
-        if (label === this.active) return;
-
-        // Update active without full re-render for smoothness
-        this.$$('button').forEach(b => {
-          const isActive = b.dataset.label === label;
-          b.classList.toggle('active', isActive);
-          b.setAttribute('aria-selected', String(isActive));
-          b.setAttribute('tabindex', isActive ? '0' : '-1');
-        });
-
-        this.setAttribute('active', label);
-        this.emit('change', { tab: label, index });
-      });
+    this.$('.strip').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[role="tab"]');
+      if (!btn) return;
+      const label = btn.dataset.label;
+      const index = parseInt(btn.dataset.index, 10);
+      if (label === this.active) return;
+      this.setAttribute('active', label);
+      this.emit('change', { tab: label, index });
     });
 
-    // Arrow key navigation
-    this.$$('button').forEach((btn, i, all) => {
-      btn.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowRight') { all[Math.min(i + 1, all.length - 1)]?.focus(); e.preventDefault(); }
-        if (e.key === 'ArrowLeft')  { all[Math.max(i - 1, 0)]?.focus(); e.preventDefault(); }
-      });
+    this.$('.strip').addEventListener('keydown', (e) => {
+      const focused = this.shadowRoot.activeElement;
+      if (!focused || focused.getAttribute('role') !== 'tab') return;
+      const all = this.$$('button[role="tab"]');
+      const i = all.indexOf(focused);
+      if (e.key === 'ArrowRight' && i < all.length - 1) { all[i + 1].focus(); e.preventDefault(); }
+      if (e.key === 'ArrowLeft'  && i > 0)              { all[i - 1].focus(); e.preventDefault(); }
+      if (e.key === 'Home') { all[0].focus(); e.preventDefault(); }
+      if (e.key === 'End')  { all[all.length - 1].focus(); e.preventDefault(); }
     });
   }
 
-  // Don't re-render on active change — hydrate already handles it
-  update(name) {
-    if (name !== 'active') {
+  update(name, _old, newVal) {
+    if (name === 'active') {
+      // Patch visual state only — no re-render
+      const target = newVal || this._tabs()[0];
+      this.$$('button[role="tab"]').forEach(btn => {
+        const isActive = btn.dataset.label === target;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-selected', String(isActive));
+        btn.setAttribute('tabindex', isActive ? '0' : '-1');
+      });
+      return;
+    }
+    if (name === 'tabs') {
+      // Tab labels changed — rebuild strip and re-hydrate listeners
       this._render();
       this.hydrate();
     }

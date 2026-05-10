@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<title>Tokamak UI — Smoke Test</title>
+<link rel="stylesheet" href="./tokamak.css">
+<script src="./tokamak.min.js"></script>
+<style>
+  body { font-family: 'JetBrains Mono', monospace; background: var(--tok-bg); color: var(--tok-fg); padding: 40px; margin: 0; transition: background .25s, color .25s; }
+  h2 { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--tok-fg-3); margin: 32px 0 16px; padding-bottom: 6px; border-bottom: 1px solid var(--tok-border); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .log { font-size: 11px; color: var(--tok-fg-3); padding: 8px; background: var(--tok-bg-2); margin-top: 12px; min-height: 60px; max-height: 140px; overflow-y: auto; border: 1px solid var(--tok-border); }
+  .log div { margin-bottom: 2px; }
+</style>
+</head>
+<body>
+
+<h1 style="font-size:18px">Tokamak Smoke Test</h1>
+<p style="font-size:11px; color:var(--tok-fg-2); max-width:560px">Every component exercised. All events logged. Toggle dark mode bottom-right.</p>
+
+<h2>Buttons</h2>
+<div class="row">
+  <tok-button id="b1">Primary</tok-button>
+  <tok-button variant="secondary">Secondary</tok-button>
+  <tok-button variant="ghost">Ghost</tok-button>
+  <tok-button variant="danger">Danger</tok-button>
+  <tok-button disabled>Disabled</tok-button>
+</div>
+<div class="row">
+  <tok-button size="sm">Small</tok-button>
+  <tok-button size="md">Medium</tok-button>
+  <tok-button size="lg">Large</tok-button>
+</div>
+
+<h2>Badges</h2>
+<div class="row">
+  <tok-badge>Solid</tok-badge>
+  <tok-badge variant="outline">Outline</tok-badge>
+  <tok-badge variant="muted">Muted</tok-badge>
+  <tok-badge>Quotes "test" 'test'</tok-badge>
+  <tok-badge>&lt;script&gt;XSS</tok-badge>
+</div>
+
+<h2>Inputs (form-associated)</h2>
+<form id="testForm" onsubmit="event.preventDefault(); logFormData()">
+  <tok-field label="Email" hint="Try Tab to focus, then type">
+    <tok-input id="i1" name="email" type="email" placeholder="you@example.com" required></tok-input>
+  </tok-field>
+  <tok-field label="Region">
+    <tok-select name="region" value="eu">
+      <option value="us">United States</option>
+      <option value="eu">Europe</option>
+      <option value="ap">Asia-Pacific</option>
+    </tok-select>
+  </tok-field>
+  <tok-field label="Plan">
+    <tok-radio-group name="plan" value="pro">
+      <tok-radio value="free" label="Free"></tok-radio>
+      <tok-radio value="pro" label="Pro"></tok-radio>
+      <tok-radio value="enterprise" label="Enterprise"></tok-radio>
+    </tok-radio-group>
+  </tok-field>
+  <div class="row">
+    <tok-toggle name="newsletter" value="yes" label="Subscribe to newsletter" checked></tok-toggle>
+  </div>
+  <div class="row">
+    <tok-checkbox name="terms" value="1" label="Accept terms"></tok-checkbox>
+  </div>
+  <div class="row">
+    <tok-button type="submit">Submit form</tok-button>
+    <tok-button variant="ghost" id="resetBtn">Reset</tok-button>
+  </div>
+</form>
+
+<h2>Cards</h2>
+<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; max-width: 660px">
+  <tok-card title="Title only"></tok-card>
+  <tok-card title="With badge" body="Subtitle text" badge="new"></tok-card>
+  <tok-card>
+    <span slot="title">Slotted title</span>
+    Full body via default slot. Supports <strong>HTML</strong>.
+  </tok-card>
+</div>
+
+<h2>Tabs</h2>
+<tok-tabs id="t1" tabs="Overview,Tokens,Components,Changelog" active="Tokens"></tok-tabs>
+
+<h2>Progress</h2>
+<tok-progress id="p1" value="35" label="Build" style="max-width:400px; display:block; margin-bottom:8px"></tok-progress>
+<tok-progress value="72" label="Tests" size="sm" style="max-width:400px; display:block; margin-bottom:8px"></tok-progress>
+<tok-progress value="100" label="Done" size="lg" style="max-width:400px; display:block"></tok-progress>
+<tok-button id="randomize" style="margin-top:12px">Randomize progress</tok-button>
+
+<h2>Panel</h2>
+<div class="row">
+  <tok-button id="openPanel">Open panel</tok-button>
+  <tok-button variant="ghost" id="open2Panels">Open both panels</tok-button>
+</div>
+
+<tok-panel id="panel1">
+  <span slot="title">Panel 1</span>
+  <span slot="subtitle">Test panel with form fields inside.</span>
+  <tok-field label="Inner input">
+    <tok-input placeholder="Type here..."></tok-input>
+  </tok-field>
+  <div slot="actions">
+    <tok-button>Save</tok-button>
+    <tok-button variant="ghost" onclick="document.querySelector('#panel1').hide()">Cancel</tok-button>
+  </div>
+</tok-panel>
+
+<tok-panel id="panel2" width="40%">
+  <span slot="title">Panel 2</span>
+  <span slot="subtitle">Narrower panel.</span>
+  <p style="font-size:12px; color:var(--tok-fg-2); line-height:1.7">When both panels close, body scroll should be restored. If you can scroll the page after this is closed, the scroll-lock counter works.</p>
+  <div slot="actions">
+    <tok-button variant="ghost" onclick="document.querySelector('#panel2').hide()">Close</tok-button>
+  </div>
+</tok-panel>
+
+<h2>Event Log</h2>
+<div class="log" id="log"></div>
+
+<div style="position:fixed; bottom:20px; right:20px;">
+  <tok-toggle id="themeToggle" label="Dark mode"></tok-toggle>
+</div>
+
+<script>
+  const log = document.getElementById('log');
+  function L(msg) {
+    const d = document.createElement('div');
+    d.textContent = '› ' + msg;
+    log.prepend(d);
+  }
+
+  // Wire up all events
+  document.getElementById('b1').addEventListener('tok-click', () => L('button clicked'));
+  document.getElementById('i1').addEventListener('tok-change', e => L('input changed: ' + e.detail.value));
+  document.getElementById('t1').addEventListener('tok-change', e => L('tab: ' + e.detail.tab));
+  document.querySelector('tok-radio-group').addEventListener('tok-change', e => L('radio: ' + e.detail.value));
+  document.querySelectorAll('tok-toggle').forEach(t => {
+    t.addEventListener('tok-change', e => L('toggle "' + (t.getAttribute('label') || t.id) + '": ' + e.detail.checked));
+  });
+  document.querySelector('tok-checkbox').addEventListener('tok-change', e => L('checkbox: ' + e.detail.checked));
+
+  // Theme toggle
+  document.getElementById('themeToggle').addEventListener('tok-change', e => {
+    document.documentElement.dataset.theme = e.detail.checked ? 'dark' : 'light';
+    L('theme: ' + document.documentElement.dataset.theme);
+  });
+
+  // Form submit
+  function logFormData() {
+    const fd = new FormData(document.getElementById('testForm'));
+    const entries = [...fd.entries()];
+    L('FORM SUBMIT → ' + (entries.length ? JSON.stringify(Object.fromEntries(entries)) : '(empty)'));
+  }
+
+  // Reset
+  document.getElementById('resetBtn').addEventListener('tok-click', () => {
+    document.getElementById('testForm').reset();
+    L('form reset');
+  });
+
+  // Randomize progress
+  document.getElementById('randomize').addEventListener('tok-click', () => {
+    const v = Math.floor(Math.random() * 100);
+    document.getElementById('p1').value = v;
+    L('progress → ' + v);
+  });
+
+  // Panels
+  document.getElementById('openPanel').addEventListener('tok-click', () => {
+    document.getElementById('panel1').show();
+  });
+  document.getElementById('open2Panels').addEventListener('tok-click', () => {
+    document.getElementById('panel1').show();
+    document.getElementById('panel2').show();
+  });
+  document.getElementById('panel1').addEventListener('tok-open',  () => L('panel1 opened'));
+  document.getElementById('panel1').addEventListener('tok-close', () => L('panel1 closed'));
+  document.getElementById('panel2').addEventListener('tok-open',  () => L('panel2 opened'));
+  document.getElementById('panel2').addEventListener('tok-close', () => L('panel2 closed'));
+
+  // XSS escape test
+  setTimeout(() => {
+    const b = document.createElement('tok-button');
+    b.textContent = '"><script>alert(1)<\/script>';
+    document.body.appendChild(b);
+    L('XSS escape test: button text = ' + b.shadowRoot.textContent.trim().slice(0,60));
+  }, 500);
+
+  L('ready');
+</script>
+
+</body>
+</html>

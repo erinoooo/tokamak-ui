@@ -1,45 +1,27 @@
 /**
  * tokamak-ui · tok-button
  *
- * Attributes:
+ * A parallelogram button.
+ *
+ * Attributes (reflect to CSS via [data-*] selectors — no re-render needed):
  *   variant  — "primary" | "secondary" | "ghost" | "danger"  (default: "primary")
- *   size     — "sm" | "md" | "lg"                             (default: "md")
+ *   size     — "sm" | "md" | "lg"                              (default: "md")
  *   disabled — boolean
+ *   type     — "button" | "submit" | "reset"  (default: "button")
  *
  * Events:
  *   tok-click — fired on click when not disabled. Bubbles, composed.
  *
  * Slots:
- *   (default) — button label text
- *
- * @example
- *   <tok-button variant="ghost" size="sm">Cancel</tok-button>
+ *   (default) — button label content
  */
 
 import { TokamakElement } from '../utils.js';
 
-const VARIANTS = {
-  primary:   'background: var(--fg); color: var(--bg);',
-  secondary: 'background: var(--bg-3); color: var(--fg);',
-  ghost:     'background: transparent; color: var(--fg); box-shadow: inset 0 0 0 1.5px var(--fg);',
-  danger:    'background: transparent; color: var(--fg); box-shadow: inset 0 0 0 1.5px var(--border); border-bottom: 2px solid var(--fg);',
-};
-
-const SIZES = {
-  sm: { h: '30px', px: '18px', fs: '9px'  },
-  md: { h: '40px', px: '28px', fs: '11px' },
-  lg: { h: '52px', px: '44px', fs: '13px' },
-};
-
 export class TokButton extends TokamakElement {
-  static observedAttributes = ['variant', 'size', 'disabled'];
+  static observedAttributes = ['variant', 'size', 'disabled', 'type'];
 
   styles() {
-    const v  = this.attr('variant', 'primary');
-    const sz = SIZES[this.attr('size', 'md')] ?? SIZES.md;
-    const vs = VARIANTS[v] ?? VARIANTS.primary;
-    const disabled = this.bool('disabled');
-
     return `
       :host { display: inline-block; }
 
@@ -47,61 +29,89 @@ export class TokButton extends TokamakElement {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0 ${sz.px};
-        height: ${sz.h};
         font-family: 'JetBrains Mono', monospace;
-        font-size: ${sz.fs};
         font-weight: 600;
         letter-spacing: 0.1em;
         text-transform: uppercase;
-        cursor: ${disabled ? 'not-allowed' : 'pointer'};
+        cursor: pointer;
         border: none;
         outline: none;
-        transform: skewX(var(--skew));
-        opacity: ${disabled ? '0.3' : '1'};
+        transform: skewX(var(--tok-skew));
         transition:
-          filter var(--dur-fast) var(--ease-out),
-          transform var(--dur-fast) var(--ease-spring),
-          opacity var(--dur-base) var(--ease-out);
-        ${vs}
+          filter     var(--tok-dur-fast) var(--tok-ease-out),
+          transform  var(--tok-dur-fast) var(--tok-ease-spring),
+          opacity    var(--tok-dur-base) var(--tok-ease-out),
+          background var(--tok-dur-base) var(--tok-ease-out),
+          color      var(--tok-dur-base) var(--tok-ease-out),
+          box-shadow var(--tok-dur-base) var(--tok-ease-out);
       }
 
-      button:hover:not(:disabled) {
-        filter: brightness(0.88);
+      /* Sizes */
+      :host([size="sm"]) button { height: 30px; padding: 0 18px; font-size: 9px; }
+      :host(:not([size])) button,
+      :host([size="md"])  button { height: 40px; padding: 0 28px; font-size: 11px; }
+      :host([size="lg"])  button { height: 52px; padding: 0 44px; font-size: 13px; }
+
+      /* Variants */
+      :host(:not([variant])) button,
+      :host([variant="primary"]) button { background: var(--tok-fg); color: var(--tok-bg); }
+      :host([variant="secondary"]) button { background: var(--tok-bg-3); color: var(--tok-fg); }
+      :host([variant="ghost"]) button {
+        background: transparent; color: var(--tok-fg);
+        box-shadow: inset 0 0 0 1.5px var(--tok-fg);
+      }
+      :host([variant="danger"]) button {
+        background: transparent; color: var(--tok-fg);
+        box-shadow: inset 0 0 0 1.5px var(--tok-border), inset 0 -2px 0 0 var(--tok-fg);
       }
 
-      button:active:not(:disabled) {
-        filter: brightness(0.72);
-        transform: skewX(var(--skew)) translateY(1px);
-      }
-
-      /* Focus ring — accessibility */
+      :host([disabled]) button { opacity: 0.3; cursor: not-allowed; }
+      button:hover:not(:disabled)  { filter: brightness(0.88); }
+      button:active:not(:disabled) { filter: brightness(0.72); transform: skewX(var(--tok-skew)) translateY(1px); }
       button:focus-visible {
-        outline: 2px solid var(--fg);
+        outline: 2px solid var(--tok-fg);
         outline-offset: 3px;
       }
 
       .inner {
         display: inline-block;
-        transform: skewX(calc(var(--skew) * -1));
-        /* Prevent text from shifting during the active press */
-        transition: transform var(--dur-fast) var(--ease-spring);
+        transform: skewX(calc(var(--tok-skew) * -1));
+        white-space: nowrap;
       }
     `;
   }
 
   template() {
-    const disabled = this.bool('disabled');
-    return `<button ${disabled ? 'disabled' : ''} part="button">
+    const type = this.attr('type', 'button');
+    const safeType = (type === 'submit' || type === 'reset') ? type : 'button';
+    const dis  = this.bool('disabled');
+    return `<button type="${safeType}" ${dis ? 'disabled' : ''} part="button">
       <span class="inner"><slot></slot></span>
     </button>`;
   }
 
   hydrate() {
-    this.$('button').addEventListener('click', (e) => {
-      if (this.bool('disabled')) { e.stopPropagation(); return; }
+    const btn = this.$('button');
+    btn.addEventListener('click', (e) => {
+      if (this.bool('disabled')) {
+        e.stopImmediatePropagation();
+        return;
+      }
       this.emit('click');
     });
+  }
+
+  update(name) {
+    // All visual styling is driven by host attribute selectors —
+    // no innerHTML rewrite needed. We just sync DOM properties
+    // that CSS can't express.
+    const btn = this.$('button');
+    if (!btn) return;
+    if (name === 'disabled') btn.disabled = this.bool('disabled');
+    if (name === 'type') {
+      const t = this.attr('type', 'button');
+      btn.type = (t === 'submit' || t === 'reset') ? t : 'button';
+    }
   }
 }
 

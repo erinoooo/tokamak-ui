@@ -5,53 +5,55 @@
  *
  * Attributes:
  *   value  — number 0–100 (default: 0)
- *   label  — description text shown bottom-left
- *   size   — "sm" | "md" | "lg"  (default: "md")
+ *   label  — descriptor text below-left
+ *   size   — "sm" | "md" | "lg" (default: "md")
  *
  * Properties:
- *   .value — get/set progress (animates smoothly)
- *
- * @example
- *   <tok-progress value="68" label="Build progress"></tok-progress>
+ *   .value — get/set; animates smoothly
  */
 
-import { TokamakElement } from '../utils.js';
+import { TokamakElement, esc } from '../utils.js';
 
-const HEIGHTS = { sm: '4px', md: '8px', lg: '12px' };
+function clamp(v) {
+  const n = parseFloat(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, n));
+}
 
 export class TokProgress extends TokamakElement {
   static observedAttributes = ['value', 'label', 'size'];
 
-  get value() { return parseFloat(this.attr('value', '0')); }
-  set value(v) {
-    this.setAttribute('value', String(Math.min(100, Math.max(0, v))));
-  }
+  get value() { return clamp(this.attr('value', '0')); }
+  set value(v) { this.setAttribute('value', String(clamp(v))); }
 
   styles() {
-    const sz = HEIGHTS[this.attr('size', 'md')] ?? HEIGHTS.md;
-
     return `
       :host { display: block; }
 
       .track {
         position: relative;
-        height: ${sz};
-        background: var(--bg-3);
-        border: 1px solid var(--border);
-        transform: skewX(var(--skew));
+        background: var(--tok-bg-3);
+        border: 1px solid var(--tok-border);
+        transform: skewX(var(--tok-skew));
         overflow: hidden;
         transition:
-          background var(--dur-base) var(--ease-out),
-          border-color var(--dur-base) var(--ease-out);
+          background   var(--tok-dur-base) var(--tok-ease-out),
+          border-color var(--tok-dur-base) var(--tok-ease-out);
       }
+
+      :host(:not([size])) .track,
+      :host([size="md"])  .track { height: 8px; }
+      :host([size="sm"])  .track { height: 4px; }
+      :host([size="lg"])  .track { height: 12px; }
 
       .fill {
         position: absolute;
         top: 0; left: 0; bottom: 0;
-        background: var(--fg);
+        background: var(--tok-fg);
+        width: 0%;
         transition:
-          width var(--dur-slow) var(--ease-spring),
-          background var(--dur-base) var(--ease-out);
+          width      var(--tok-dur-slow) var(--tok-ease-spring),
+          background var(--tok-dur-base) var(--tok-ease-out);
       }
 
       .meta {
@@ -60,41 +62,43 @@ export class TokProgress extends TokamakElement {
         margin-top: 6px;
         font-size: 9px;
         letter-spacing: 0.1em;
-        color: var(--fg-3);
-        transition: color var(--dur-base) var(--ease-out);
+        color: var(--tok-fg-3);
+        transition: color var(--tok-dur-base) var(--tok-ease-out);
       }
+      .meta .label:empty { display: none; }
     `;
   }
 
   template() {
-    const val   = Math.min(100, Math.max(0, parseFloat(this.attr('value', '0'))));
-    const label = this.attr('label');
-
+    const v = this.value;
     return `
-      <div class="track" part="track" role="progressbar" aria-valuenow="${val}" aria-valuemin="0" aria-valuemax="100">
-        <div class="fill" part="fill" style="width: ${val}%"></div>
+      <div class="track" part="track" role="progressbar"
+           aria-valuenow="${v}" aria-valuemin="0" aria-valuemax="100">
+        <div class="fill" part="fill" style="width: ${v}%"></div>
       </div>
       <div class="meta" part="meta">
-        <span>${label}</span>
-        <span>${Math.round(val)}%</span>
+        <span class="label">${esc(this.attr('label'))}</span>
+        <span class="pct">${Math.round(v)}%</span>
       </div>
     `;
   }
 
-  // Smooth value updates — only animate the fill, don't re-render
-  update(name, _old, newVal) {
+  update(name) {
     if (name === 'value') {
-      const val  = Math.min(100, Math.max(0, parseFloat(newVal)));
+      const v = this.value;
       const fill = this.$('.fill');
-      const meta = this.$('.meta span:last-child');
+      const pct  = this.$('.pct');
       const track = this.$('.track');
-
-      if (fill) fill.style.width = `${val}%`;
-      if (meta) meta.textContent = `${Math.round(val)}%`;
-      if (track) track.setAttribute('aria-valuenow', val);
-    } else {
-      this._render();
+      if (fill)  fill.style.width  = `${v}%`;
+      if (pct)   pct.textContent   = `${Math.round(v)}%`;
+      if (track) track.setAttribute('aria-valuenow', String(v));
+      return;
     }
+    if (name === 'label') {
+      const el = this.$('.label');
+      if (el) el.textContent = this.attr('label');
+    }
+    // size handled by CSS attribute selector
   }
 }
 

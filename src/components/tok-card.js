@@ -2,30 +2,20 @@
  * tokamak-ui · tok-card
  *
  * Surface container with a parallelogram border shell.
- * Hover darkens the border. Supports optional badge, title, body,
- * or arbitrary slotted content.
  *
  * Attributes:
- *   title  — heading text (optional; use slot for richer content)
- *   body   — body text   (optional)
- *   badge  — badge label shown above title (optional)
+ *   title  — heading text
+ *   body   — body text
+ *   badge  — badge label above title
  *
  * Slots:
- *   (default) — overrides title/body when used directly
- *   badge     — custom badge element
- *   title     — custom title element
- *   footer    — optional footer content
- *
- * @example
- *   <tok-card title="Uptime" body="99.98%" badge="stable"></tok-card>
- *
- *   <tok-card>
- *     <span slot="title">Custom Title</span>
- *     <p>Full slot-driven content.</p>
- *   </tok-card>
+ *   (default) — body content (overrides `body` attribute)
+ *   title     — custom title element (overrides `title` attribute)
+ *   badge     — custom badge element (overrides `badge` attribute)
+ *   footer    — bottom footer area
  */
 
-import { TokamakElement } from '../utils.js';
+import { TokamakElement, esc } from '../utils.js';
 
 export class TokCard extends TokamakElement {
   static observedAttributes = ['title', 'body', 'badge'];
@@ -37,24 +27,24 @@ export class TokCard extends TokamakElement {
       .shell {
         position: relative;
         padding: 24px;
-        cursor: default;
+        min-height: 60px;
       }
 
       .shell::before {
         content: '';
         position: absolute;
         inset: 0;
-        background: var(--bg-2);
-        border: 1px solid var(--border);
-        transform: skewX(var(--skew));
+        background: var(--tok-bg-2);
+        border: 1px solid var(--tok-border);
+        transform: skewX(var(--tok-skew));
         transition:
-          border-color var(--dur-fast) var(--ease-out),
-          background   var(--dur-base) var(--ease-out);
+          border-color var(--tok-dur-fast) var(--tok-ease-out),
+          background   var(--tok-dur-base) var(--tok-ease-out);
         z-index: 0;
       }
 
       :host(:hover) .shell::before {
-        border-color: var(--border-hi);
+        border-color: var(--tok-border-hi);
       }
 
       .inner {
@@ -62,12 +52,10 @@ export class TokCard extends TokamakElement {
         z-index: 1;
       }
 
-      .badge-wrap {
-        margin-bottom: 8px;
-      }
+      .badge-wrap { margin-bottom: 8px; }
+      .badge-wrap:empty { display: none; }
 
-      /* Inline badge — same parallelogram rules */
-      .badge {
+      .badge-fallback {
         display: inline-flex;
         align-items: center;
         padding: 0 8px;
@@ -76,41 +64,38 @@ export class TokCard extends TokamakElement {
         font-weight: 700;
         letter-spacing: 0.12em;
         text-transform: uppercase;
-        background: var(--fg);
-        color: var(--bg);
-        transform: skewX(var(--skew));
+        background: var(--tok-fg);
+        color: var(--tok-bg);
+        transform: skewX(var(--tok-skew));
       }
-      .badge span {
+      .badge-fallback span {
         display: inline-block;
-        transform: skewX(calc(var(--skew) * -1));
+        transform: skewX(calc(var(--tok-skew) * -1));
       }
 
-      .title {
+      .title-fallback {
         font-size: 13px;
         font-weight: 700;
         letter-spacing: -0.01em;
-        color: var(--fg);
+        color: var(--tok-fg);
         margin-bottom: 6px;
-        transition: color var(--dur-base) var(--ease-out);
+        transition: color var(--tok-dur-base) var(--tok-ease-out);
       }
+      .title-fallback:empty { display: none; }
 
-      .body {
+      .body-fallback {
         font-size: 11px;
-        color: var(--fg-2);
+        color: var(--tok-fg-2);
         line-height: 1.75;
-        transition: color var(--dur-base) var(--ease-out);
+        transition: color var(--tok-dur-base) var(--tok-ease-out);
       }
+      .body-fallback:empty { display: none; }
 
       .footer {
         margin-top: 16px;
         padding-top: 14px;
-        border-top: 1px solid var(--border);
-        transition: border-color var(--dur-base) var(--ease-out);
-      }
-
-      /* Slot-based footer only visible if slotted content present */
-      slot[name="footer"]::slotted(*) {
-        display: block;
+        border-top: 1px solid var(--tok-border);
+        transition: border-color var(--tok-dur-base) var(--tok-ease-out);
       }
     `;
   }
@@ -124,19 +109,38 @@ export class TokCard extends TokamakElement {
       <div class="shell" part="shell">
         <div class="inner">
           <slot name="badge">
-            ${badge ? `<div class="badge-wrap"><div class="badge"><span>${badge}</span></div></div>` : ''}
+            <div class="badge-wrap">${badge ? `<div class="badge-fallback"><span>${esc(badge)}</span></div>` : ''}</div>
           </slot>
           <slot name="title">
-            ${title ? `<div class="title" part="title">${title}</div>` : ''}
+            <div class="title-fallback" part="title">${esc(title)}</div>
           </slot>
           <slot>
-            ${body ? `<div class="body" part="body">${body}</div>` : ''}
+            <div class="body-fallback" part="body">${esc(body)}</div>
           </slot>
-          <slot name="footer">
-          </slot>
+          <slot name="footer"></slot>
         </div>
       </div>
     `;
+  }
+
+  update(name) {
+    if (name === 'title') {
+      const el = this.$('.title-fallback');
+      if (el) el.textContent = this.attr('title');
+      return;
+    }
+    if (name === 'body') {
+      const el = this.$('.body-fallback');
+      if (el) el.textContent = this.attr('body');
+      return;
+    }
+    if (name === 'badge') {
+      const wrap = this.$('.badge-wrap');
+      if (!wrap) return;
+      const v = this.attr('badge');
+      wrap.innerHTML = v ? `<div class="badge-fallback"><span></span></div>` : '';
+      if (v) wrap.querySelector('span').textContent = v;
+    }
   }
 }
 

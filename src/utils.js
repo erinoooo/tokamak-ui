@@ -1,117 +1,187 @@
 /**
  * tokamak-ui · utils.js
- * Base class and helpers shared by all Tokamak components.
+ *
+ * Base class and shared utilities for every Tokamak component.
+ *
+ * Architecture:
+ *   - Components render once on connect.
+ *   - State changes patch the existing DOM via update() — they DO NOT
+ *     replace innerHTML. This preserves event listeners, focus state,
+ *     and CSS transitions across updates.
+ *   - Listeners attached in hydrate() are attached exactly once per
+ *     element lifetime.
+ *   - A singleton MutationObserver watches the document for theme
+ *     changes and broadcasts to every live component.
+ *   - All HTML interpolation goes through esc() to prevent XSS and
+ *     quote-breakage from user input.
  */
 
-import { THEME_TOKENS, BASE_TOKENS, injectFont } from './tokens.js';
+import { SHARED_CSS, injectFont } from './tokens.js';
 
-// Boot font on first import
 injectFont();
 
-// Singleton MutationObserver that watches for data-theme changes
-// on document.documentElement and broadcasts to all registered components.
+// ── HTML escape helper ──────────────────────────────────────
+const _escMap = {
+  '&':  '&amp;',
+  '<':  '&lt;',
+  '>':  '&gt;',
+  '"':  '&quot;',
+  "'":  '&#39;',
+  '`':  '&#96;',
+};
+
+/** Escape a value for safe interpolation into HTML strings. Handles null/undefined. */
+export function esc(v) {
+  if (v == null) return '';
+  return String(v).replace(/[&<>"'`]/g, ch => _escMap[ch]);
+}
+
+// ── Singleton theme observer ────────────────────────────────
 const _themeListeners = new Set();
-let _observer = null;
+let _themeObserver = null;
+
+function getCurrentTheme() {
+  if (typeof document === 'undefined') return false;
+  return document.documentElement.dataset.theme === 'dark';
+}
 
 function ensureThemeObserver() {
-  if (_observer) return;
-  _observer = new MutationObserver(() => {
-    const dark = document.documentElement.dataset.theme === 'dark';
-    _themeListeners.forEach(fn => fn(dark));
+  if (_themeObserver || typeof document === 'undefined') return;
+  _themeObserver = new MutationObserver(() => {
+    const dark = getCurrentTheme();
+    _themeListeners.forEach(fn => {
+      try { fn(dark); } catch (e) { /* swallow — don't let one bad listener break others */ }
+    });
   });
-  _observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  _themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  });
 }
+
+// ── Singleton body scroll lock with reference counting ──────
+// Multiple panels can request a scroll lock; only the last one to
+// release it actually unlocks the body.
+let _scrollLockCount = 0;
+let _scrollLockPrev = '';
+
+export function lockBodyScroll() {
+  if (typeof document === 'undefined') return;
+  if (_scrollLockCount === 0) {
+    _scrollLockPrev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+  _scrollLockCount++;
+}
+
+export function unlockBodyScroll() {
+  if (typeof document === 'undefined') return;
+  if (_scrollLockCount === 0) return;
+  _scrollLockCount--;
+  if (_scrollLockCount === 0) {
+    document.body.style.overflow = _scrollLockPrev;
+    _scrollLockPrev = '';
+  }
+}
+
+// ── Base class ──────────────────────────────────────────────
 
 /**
  * TokamakElement
- * Base class for all Tokamak web components.
  *
  * Subclasses implement:
- *   - template()  → string  — inner HTML for the shadow root (excluding style)
- *   - styles()    → string  — component-specific CSS
- *   - hydrate()   — called after shadow root is first populated; attach listeners
- *   - update()    — called on attributeChangedCallback; re-render if needed
+ *   - static observedAttributes (standard)
+ *   - styles()    → CSS string for this component
+ *   - template()  → HTML string for the shadow root
+ *   - hydrate()   → attach listeners ONCE after first render
+ *   - update(name, oldVal, newVal) → patch DOM in response to attribute change
+ *
+ * Subclasses MUST NOT call this._render() outside of connectedCallback
+ * unless they also re-call hydrate. The recommended pattern is to
+ * patch existing nodes directly via this.$('.foo'), keeping listeners alive.
  */
 export class TokamakElement extends HTMLElement {
   constructor() {
     super();
-    this._dark = false;
-    this._ready = false;
+    this._connected = false;
+    this._dark = getCurrentTheme();
+    this._themeHandler = null;
     this.attachShadow({ mode: 'open' });
   }
 
   connectedCallback() {
-    this._dark = document.documentElement.dataset.theme === 'dark';
-    this._render();
-    this._ready = true;
+    if (this._connected) return; // guard against re-insertion
+    this._connected = true;
 
-    // Register for theme changes
+    this._dark = getCurrentTheme();
+    this._render();
+    this.classList.toggle('tok-dark', this._dark);
+
+    // Subscribe to theme changes
     this._themeHandler = (dark) => {
-      if (dark !== this._dark) {
-        this._dark = dark;
-        this.shadowRoot.host.classList.toggle('tok-dark', dark);
-        this._onThemeChange(dark);
-      }
+      this._dark = dark;
+      this.classList.toggle('tok-dark', dark);
+      this.onThemeChange(dark);
     };
     _themeListeners.add(this._themeHandler);
     ensureThemeObserver();
 
-    // Apply current theme immediately
-    this.shadowRoot.host.classList.toggle('tok-dark', this._dark);
     this.hydrate();
+    this.afterConnect();
   }
 
   disconnectedCallback() {
-    _themeListeners.delete(this._themeHandler);
+    this._connected = false;
+    if (this._themeHandler) {
+      _themeListeners.delete(this._themeHandler);
+      this._themeHandler = null;
+    }
+    this.beforeDisconnect();
   }
 
   attributeChangedCallback(name, oldVal, newVal) {
-    if (!this._ready || oldVal === newVal) return;
+    if (!this._connected || oldVal === newVal) return;
     this.update(name, oldVal, newVal);
   }
 
-  /** Override in subclass — return CSS string */
-  styles() { return ''; }
+  // ── Hooks for subclasses to override ──────────────────────
 
-  /** Override in subclass — return HTML string */
+  styles()   { return ''; }
   template() { return ''; }
+  hydrate()  {}
+  /** Override to patch DOM in response to attribute changes */
+  update()   {}
+  /** Override for theme-specific side effects (most components don't need this — CSS handles it) */
+  onThemeChange() {}
+  /** Override for additional setup after first render + hydrate */
+  afterConnect() {}
+  /** Override for cleanup of document/window listeners */
+  beforeDisconnect() {}
 
-  /** Override in subclass — attach event listeners after first render */
-  hydrate() {}
-
-  /** Override in subclass — respond to attribute changes */
-  update() { this._render(); }
-
-  /** Override to respond to theme changes without full re-render */
-  _onThemeChange() {}
+  // ── Internal ──────────────────────────────────────────────
 
   _render() {
-    this.shadowRoot.innerHTML = `
-      <style>
-        ${BASE_TOKENS}
-        ${THEME_TOKENS}
-        ${this.styles()}
-      </style>
-      ${this.template()}
-    `;
+    this.shadowRoot.innerHTML =
+      `<style>${SHARED_CSS}\n${this.styles()}</style>${this.template()}`;
   }
 
-  // ── Helpers ──────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────
 
-  /** Emit a custom event that bubbles and is composed (crosses shadow boundaries) */
+  /** Dispatch a custom event that bubbles and crosses shadow boundaries */
   emit(name, detail = {}) {
     this.dispatchEvent(new CustomEvent(`tok-${name}`, {
       detail,
-      bubbles: true,
+      bubbles:  true,
       composed: true,
     }));
   }
 
   /** Shorthand for shadowRoot.querySelector */
   $  (sel) { return this.shadowRoot.querySelector(sel); }
-  $$ (sel) { return this.shadowRoot.querySelectorAll(sel); }
+  /** Shorthand for shadowRoot.querySelectorAll, returns Array */
+  $$ (sel) { return Array.from(this.shadowRoot.querySelectorAll(sel)); }
 
-  /** Read an attribute with an optional fallback */
+  /** Get an attribute with a fallback */
   attr(name, fallback = '') {
     return this.getAttribute(name) ?? fallback;
   }
@@ -119,5 +189,11 @@ export class TokamakElement extends HTMLElement {
   /** True if a boolean attribute is present */
   bool(name) {
     return this.hasAttribute(name);
+  }
+
+  /** Toggle a boolean attribute */
+  setBool(name, on) {
+    if (on) this.setAttribute(name, '');
+    else    this.removeAttribute(name);
   }
 }

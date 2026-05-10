@@ -1,6 +1,6 @@
 {
   "name": "tokamak-ui",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Web component library. Every corner is a parallelogram.",
   "author": "Eren Eksi <eren@ereneksi.com>",
   "license": "MIT",
@@ -32,6 +32,7 @@
     "dev": "node build.js --watch"
   },
   "devDependencies": {
-    "esbuild": "^0.20.0"
+    "esbuild": "^0.20.0",
+    "jsdom": "^29.1.1"
   }
 }

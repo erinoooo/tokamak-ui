@@ -1,13 +1,10 @@
 /**
  * tokamak-ui · tok-panel
  *
- * The signature Tokamak component.
- * A drawer panel with a circular leading edge. A circle of radius 80vh
- * forms the left boundary, clipped to viewport edges by overflow:hidden.
- * The hard cut at the screen boundary is intentional.
+ * Drawer panel with a circular leading edge.
  *
  * Attributes:
- *   open  — boolean; presence = panel is open
+ *   open  — boolean; presence = open
  *   width — CSS value for panel width (default: "60%")
  *
  * Properties:
@@ -16,202 +13,163 @@
  * Methods:
  *   .show()   — open the panel
  *   .hide()   — close the panel
- *   .toggle() — toggle open/closed
+ *   .toggle() — toggle
  *
  * Events:
- *   tok-open  — fires when panel finishes opening. Bubbles, composed.
- *   tok-close — fires when panel finishes closing. Bubbles, composed.
+ *   tok-open  — fires after open transition completes. Bubbles, composed.
+ *   tok-close — fires after close transition completes. Bubbles, composed.
  *
  * Slots:
- *   (default)  — panel body content
- *   title      — panel heading text
- *   subtitle   — panel description text
- *   actions    — footer action buttons
- *
- * @example
- *   <tok-panel id="settings">
- *     <span slot="title">Settings</span>
- *     <span slot="subtitle">Adjust your configuration.</span>
- *     <tok-field label="Endpoint">
- *       <tok-input placeholder="https://..."></tok-input>
- *     </tok-field>
- *     <div slot="actions">
- *       <tok-button>Save</tok-button>
- *     </div>
- *   </tok-panel>
- *
- *   <script>
- *     document.querySelector('#settings').show();
- *   </script>
+ *   (default)  — body content
+ *   title      — heading
+ *   subtitle   — description
+ *   actions    — footer button row
  */
 
-import { TokamakElement } from '../utils.js';
+import { TokamakElement, lockBodyScroll, unlockBodyScroll } from '../utils.js';
 
 export class TokPanel extends TokamakElement {
   static observedAttributes = ['open', 'width'];
 
-  get open() { return this.bool('open'); }
-  set open(v) {
-    v ? this.setAttribute('open', '') : this.removeAttribute('open');
+  constructor() {
+    super();
+    this._locked = false;
+    this._prevFocus = null;
+    this._onKeyDown = this._onKeyDown.bind(this);
+    this._onTransitionEnd = this._onTransitionEnd.bind(this);
   }
+
+  get open() { return this.bool('open'); }
+  set open(v) { this.setBool('open', !!v); }
 
   show()   { this.open = true;  }
   hide()   { this.open = false; }
   toggle() { this.open = !this.open; }
 
   styles() {
-    const width = this.attr('width', '60%');
-
     return `
-      :host {
-        display: contents; /* doesn't add layout to the host itself */
-      }
+      :host { display: contents; }
 
-      /* ── Overlay backdrop ── */
       .overlay {
         position: fixed;
         inset: 0;
         background: rgba(0, 0, 0, 0);
         z-index: 400;
         pointer-events: none;
-        transition: background var(--dur-slow) var(--ease-out);
+        transition: background var(--tok-dur-slow) var(--tok-ease-out);
       }
 
-      .overlay.open {
+      :host([open]) .overlay {
         background: rgba(0, 0, 0, 0.52);
         pointer-events: all;
       }
 
-      /* ── Panel wrapper — clips the circle ── */
       .wrap {
         position: absolute;
         top: 0; right: 0; bottom: 0;
-        width: ${width};
-        overflow: hidden; /* ← this clips the circle at screen edges */
+        width: var(--tok-panel-width, 60%);
+        overflow: hidden;
         transform: translateX(100%);
-        transition: transform var(--dur-slow) var(--ease-spring);
+        transition: transform var(--tok-dur-slow) var(--tok-ease-spring);
         will-change: transform;
       }
 
-      .overlay.open .wrap {
-        transform: translateX(0);
-      }
+      :host([open]) .wrap { transform: translateX(0); }
 
-      /* ── The circle that forms the leading edge ──
-         radius = 80vh → diameter = 160vh
-         Center at: x = 80vh from panel left, y = 50% (screen center)
-         Leftmost point of circle: panel left boundary at screen center.
-         Overflows viewport by ~30vh top and bottom — clipped by .wrap.
-      ── */
       .circle {
         position: absolute;
         width: 160vh;
         height: 160vh;
         border-radius: 50%;
-        background: var(--bg);
+        background: var(--tok-bg);
         top: 50%;
         left: 0;
         transform: translateY(-50%);
         box-shadow: -4px 0 80px rgba(0, 0, 0, 0.14);
-        transition: background var(--dur-base) var(--ease-out);
+        transition: background var(--tok-dur-base) var(--tok-ease-out);
         pointer-events: none;
       }
 
-      /* ── Scrollable content area ──
-         Left padding must clear the circle arc.
-         Arc x at screen top/bottom ≈ 80 - √(80²−50²) ≈ 18vh from panel left.
-         24vh left padding gives breathing room.
-      ── */
       .content {
         position: absolute;
         inset: 0;
         padding: 64px 56px 64px 24vh;
         overflow-y: auto;
         scrollbar-width: thin;
-        scrollbar-color: var(--border) transparent;
+        scrollbar-color: var(--tok-border) transparent;
       }
 
       .content::-webkit-scrollbar { width: 3px; }
-      .content::-webkit-scrollbar-thumb { background: var(--border); }
+      .content::-webkit-scrollbar-thumb { background: var(--tok-border); }
 
-      /* ── Close button ── */
       .close-btn {
         position: absolute;
         top: 28px;
         left: 24vh;
         background: none;
         border: none;
-        color: var(--fg-2);
+        color: var(--tok-fg-2);
         font-family: 'JetBrains Mono', monospace;
         font-size: 10px;
         cursor: pointer;
         letter-spacing: 0.1em;
         text-transform: uppercase;
         padding: 6px 0;
-        transition: color var(--dur-fast) var(--ease-out);
+        transition: color var(--tok-dur-fast) var(--tok-ease-out);
         z-index: 1;
+        outline: none;
       }
+      .close-btn:hover { color: var(--tok-fg); }
+      .close-btn:focus-visible { outline: 2px solid var(--tok-fg); outline-offset: 4px; }
 
-      .close-btn:hover { color: var(--fg); }
+      .header { margin-top: 48px; margin-bottom: 28px; }
 
-      /* ── Panel header ── */
-      .header {
-        margin-top: 48px;
-        margin-bottom: 28px;
+      .title-text, .subtitle-text {
+        display: block;
+        transition: color var(--tok-dur-base) var(--tok-ease-out);
       }
-
-      .title-slot {
+      .title-text {
         font-size: 24px;
         font-weight: 700;
         letter-spacing: -0.02em;
-        color: var(--fg);
-        display: block;
+        color: var(--tok-fg);
         margin-bottom: 6px;
-        transition: color var(--dur-base) var(--ease-out);
       }
-
-      .subtitle-slot {
+      .subtitle-text {
         font-size: 12px;
-        color: var(--fg-2);
+        color: var(--tok-fg-2);
         line-height: 1.8;
-        display: block;
-        transition: color var(--dur-base) var(--ease-out);
+      }
+      .title-text:has(slot[name="title"]:empty),
+      .subtitle-text:has(slot[name="subtitle"]:empty) {
+        /* Hidden via CSS :has — modern browsers only; falls back gracefully */
       }
 
-      /* ── Footer actions ── */
       .actions {
         margin-top: 28px;
         padding-top: 20px;
-        border-top: 1px solid var(--border);
+        border-top: 1px solid var(--tok-border);
         display: flex;
         gap: 10px;
         flex-wrap: wrap;
-        transition: border-color var(--dur-base) var(--ease-out);
+        transition: border-color var(--tok-dur-base) var(--tok-ease-out);
       }
-
-      /* Animate panel content in on open */
-      .overlay.open .content {
-        animation: panelIn var(--dur-slow) var(--ease-spring) 80ms both;
-      }
-
-      @keyframes panelIn {
-        from { opacity: 0; transform: translateX(24px); }
-        to   { opacity: 1; transform: translateX(0); }
+      .actions:has(slot[name="actions"]:empty) {
+        display: none;
       }
     `;
   }
 
   template() {
-    const isOpen = this.bool('open');
     return `
-      <div class="overlay ${isOpen ? 'open' : ''}" part="overlay">
+      <div class="overlay" part="overlay">
         <div class="wrap" part="wrap">
           <div class="circle" part="circle"></div>
-          <button class="close-btn" part="close">← close</button>
+          <button class="close-btn" part="close" aria-label="Close panel">← close</button>
           <div class="content" part="content">
             <div class="header">
-              <span class="title-slot"><slot name="title"></slot></span>
-              <span class="subtitle-slot"><slot name="subtitle"></slot></span>
+              <span class="title-text"><slot name="title"></slot></span>
+              <span class="subtitle-text"><slot name="subtitle"></slot></span>
             </div>
             <slot></slot>
             <div class="actions">
@@ -224,48 +182,78 @@ export class TokPanel extends TokamakElement {
   }
 
   hydrate() {
-    // Close on backdrop click
+    // Apply width if provided
+    const w = this.attr('width');
+    if (w) this.style.setProperty('--tok-panel-width', w);
+
+    // Close button & backdrop
+    this.$('.close-btn').addEventListener('click', () => this.hide());
+
     this.$('.overlay').addEventListener('click', (e) => {
+      // Close only when clicking the actual overlay backdrop, not anything inside
       if (e.target === this.$('.overlay')) this.hide();
     });
 
-    // Close button
-    this.$('.close-btn').addEventListener('click', () => this.hide());
+    // Transition end → emit open/close
+    this.$('.wrap').addEventListener('transitionend', this._onTransitionEnd);
 
-    // Escape key
-    this._keyHandler = (e) => {
-      if (e.key === 'Escape' && this.open) this.hide();
-    };
-    document.addEventListener('keydown', this._keyHandler);
+    // Set ARIA
+    this.setAttribute('role', 'dialog');
+    this.setAttribute('aria-modal', 'true');
+    this.setAttribute('aria-hidden', String(!this.open));
 
-    // Transition end events
-    this.$('.wrap').addEventListener('transitionend', () => {
-      if (this.open) this.emit('open');
-      else           this.emit('close');
-    });
+    // If we connected with `open` already set, apply side-effects
+    if (this.open) this._applyOpenEffects(true);
   }
 
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    document.removeEventListener('keydown', this._keyHandler);
+  beforeDisconnect() {
+    document.removeEventListener('keydown', this._onKeyDown);
+    if (this._locked) {
+      unlockBodyScroll();
+      this._locked = false;
+    }
+    this.$('.wrap')?.removeEventListener('transitionend', this._onTransitionEnd);
   }
 
-  update(name) {
-    if (name === 'open') {
-      const overlay = this.$('.overlay');
-      if (overlay) overlay.classList.toggle('open', this.bool('open'));
-      // Trap/restore focus
-      if (this.bool('open')) {
-        this._prevFocus = document.activeElement;
-        this.$('.close-btn')?.focus();
-        document.body.style.overflow = 'hidden';
-      } else {
-        this._prevFocus?.focus();
-        document.body.style.overflow = '';
-      }
+  _onKeyDown(e) {
+    if (e.key === 'Escape' && this.open) {
+      e.preventDefault();
+      this.hide();
+    }
+  }
+
+  _onTransitionEnd(e) {
+    if (e.propertyName !== 'transform') return;
+    if (this.open) this.emit('open');
+    else           this.emit('close');
+  }
+
+  _applyOpenEffects(isOpen) {
+    this.setAttribute('aria-hidden', String(!isOpen));
+    if (isOpen) {
+      this._prevFocus = (document.activeElement instanceof HTMLElement) ? document.activeElement : null;
+      if (!this._locked) { lockBodyScroll(); this._locked = true; }
+      document.addEventListener('keydown', this._onKeyDown);
+      // Defer focus until after transition starts
+      requestAnimationFrame(() => this.$('.close-btn')?.focus());
     } else {
-      this._render();
-      this.hydrate();
+      if (this._locked) { unlockBodyScroll(); this._locked = false; }
+      document.removeEventListener('keydown', this._onKeyDown);
+      if (this._prevFocus && document.contains(this._prevFocus)) {
+        this._prevFocus.focus();
+      }
+      this._prevFocus = null;
+    }
+  }
+
+  update(name, _old, newVal) {
+    if (name === 'open') {
+      this._applyOpenEffects(this.open);
+      return;
+    }
+    if (name === 'width') {
+      if (newVal == null) this.style.removeProperty('--tok-panel-width');
+      else                this.style.setProperty('--tok-panel-width', newVal);
     }
   }
 }

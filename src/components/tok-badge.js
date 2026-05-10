@@ -1,31 +1,21 @@
 /**
  * tokamak-ui · tok-badge
  *
+ * Inline status badge.
+ *
  * Attributes:
  *   variant — "solid" | "outline" | "muted"  (default: "solid")
  *
  * Slots:
  *   (default) — badge label
- *
- * @example
- *   <tok-badge variant="outline">Beta</tok-badge>
  */
 
 import { TokamakElement } from '../utils.js';
-
-const VARIANTS = {
-  solid:   'background: var(--fg);   color: var(--bg);',
-  outline: 'background: transparent; color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg);',
-  muted:   'background: var(--bg-3); color: var(--fg-2);',
-};
 
 export class TokBadge extends TokamakElement {
   static observedAttributes = ['variant'];
 
   styles() {
-    const v  = this.attr('variant', 'solid');
-    const vs = VARIANTS[v] ?? VARIANTS.solid;
-
     return `
       :host { display: inline-block; }
 
@@ -40,17 +30,28 @@ export class TokBadge extends TokamakElement {
         letter-spacing: 0.1em;
         text-transform: uppercase;
         white-space: nowrap;
-        transform: skewX(var(--skew));
+        transform: skewX(var(--tok-skew));
         transition:
-          background var(--dur-fast) var(--ease-out),
-          color var(--dur-fast) var(--ease-out),
-          box-shadow var(--dur-fast) var(--ease-out);
-        ${vs}
+          background var(--tok-dur-fast) var(--tok-ease-out),
+          color      var(--tok-dur-fast) var(--tok-ease-out),
+          box-shadow var(--tok-dur-fast) var(--tok-ease-out);
+      }
+
+      :host(:not([variant])) .badge,
+      :host([variant="solid"]) .badge {
+        background: var(--tok-fg); color: var(--tok-bg);
+      }
+      :host([variant="outline"]) .badge {
+        background: transparent; color: var(--tok-fg);
+        box-shadow: inset 0 0 0 1px var(--tok-fg);
+      }
+      :host([variant="muted"]) .badge {
+        background: var(--tok-bg-3); color: var(--tok-fg-2);
       }
 
       .inner {
         display: inline-block;
-        transform: skewX(calc(var(--skew) * -1));
+        transform: skewX(calc(var(--tok-skew) * -1));
       }
     `;
   }
@@ -58,6 +59,9 @@ export class TokBadge extends TokamakElement {
   template() {
     return `<span class="badge" part="badge"><span class="inner"><slot></slot></span></span>`;
   }
+
+  /* No update() body needed — CSS handles all attribute-driven visuals */
+  update() {}
 }
 
 customElements.define('tok-badge', TokBadge);

@@ -21,7 +21,7 @@ const config = {
   target:      ['es2018'],    // broad browser support; custom elements are ES2015+
   logLevel:    'info',
   banner: {
-    js: `/* tokamak-ui v0.1.0 — https://tokamak-ui.ereneksi.com — MIT */`
+    js: `/* tokamak-ui v0.1.1 — https://tokamak-ui.ereneksi.com — MIT */`
   },
 };
 
